@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and game progression",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "highScore": { "type": "number" },
+        "totalScore": { "type": "number" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "gold": { "type": "number" },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "loginStreak": { "type": "number" },
+        "unlockedPowerups": { "type": "array" }
+      },
+      "required": ["userId", "displayName"]
+    },
+    "Score": {
+      "title": "Score",
+      "description": "Leaderboard score entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "score": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "score", "timestamp"]
+    },
+    "DailyChallenge": {
+      "title": "Daily Challenge",
+      "description": "Global daily challenge state",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "target": { "type": "number" },
+        "reward": { "type": "number" }
+      },
+      "required": ["date", "type", "target"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Multiplayer game room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostId": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
+        "difficulty": { "type": "string" },
+        "duration": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "seed": { "type": "number" }
+      },
+      "required": ["hostId", "status", "difficulty", "duration", "seed"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "Player in a multiplayer room",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "score": { "type": "number" },
+        "status": { "type": "string", "enum": ["ready", "playing", "finished"] },
+        "lastUpdate": { "type": "string", "format": "date-time" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["userId", "displayName", "score", "status"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User data and progress"
+    },
+    "leaderboards/global/entries/{scoreId}": {
+      "schema": "Score",
+      "description": "Global leaderboard entries"
+    },
+    "dailyChallenges/{date}": {
+      "schema": "DailyChallenge",
+      "description": "Daily challenge information"
+    },
+    "multiplayerRooms/{roomId}": {
+      "schema": "Room",
+      "description": "Active multiplayer rooms"
+    },
+    "multiplayerRooms/{roomId}/players/{userId}": {
+      "schema": "Player",
+      "description": "Players in specific room"
+    }
+  }
+}

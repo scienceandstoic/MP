@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- User Profile Rules ---
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.userId == request.auth.uid &&
+               data.displayName is string && data.displayName.size() <= 100 &&
+               data.highScore is number &&
+               data.totalScore is number &&
+               data.level is number &&
+               data.xp is number &&
+               data.gold is number &&
+               data.loginStreak is number;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if false; // No blanket user listing
+
+      allow create: if isOwner(userId) && isValidUser(incoming()) &&
+                      incoming().keys().hasAll(['userId', 'displayName', 'highScore', 'totalScore', 'level', 'xp', 'gold', 'loginStreak']) &&
+                      incoming().keys().size() >= 8;
+
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        // Action: Update Progress
+        incoming().diff(existing()).affectedKeys().hasOnly(['highScore', 'totalScore', 'level', 'xp', 'gold', 'lastLogin', 'loginStreak', 'unlockedPowerups', 'displayName', 'photoURL'])
+      );
+    }
+
+    // --- Leaderboard Rules ---
+    match /leaderboards/global/entries/{scoreId} {
+      function isValidScore(data) {
+        return data.userId == request.auth.uid &&
+               data.score is number && data.score >= 0 &&
+               data.timestamp == request.time &&
+               data.displayName is string && data.displayName.size() <= 100;
+      }
+
+      allow list, get: if true; // Publicly viewable leaderboards
+      allow create: if isSignedIn() && isValidScore(incoming()) && isValidId(scoreId);
+      allow update, delete: if false; // immutable scores
+    }
+
+    // --- Daily Challenges ---
+    match /dailyChallenges/{date} {
+      allow read: if isSignedIn();
+      allow write: if false; // System only (manual entries or backend needed)
+    }
+
+    // --- Multiplayer Room Rules ---
+    match /multiplayerRooms/{roomId} {
+      function isValidRoom(data) {
+        return data.hostId is string &&
+               data.status in ["waiting", "playing", "finished"] &&
+               data.difficulty in ["easy", "medium", "hard"] &&
+               data.duration is number &&
+               data.seed is number;
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidRoom(incoming()) && incoming().hostId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        // Only host can update room settings or status
+        (existing().hostId == request.auth.uid && isValidRoom(incoming()))
+      );
+      allow delete: if false;
+
+      match /players/{userId} {
+        function isValidPlayer(data) {
+          return data.userId == userId &&
+                 data.displayName is string &&
+                 data.score is number &&
+                 data.status in ["ready", "playing", "finished"];
+        }
+
+        allow read: if isSignedIn();
+        allow create: if isOwner(userId) && isValidPlayer(incoming());
+        allow update: if isOwner(userId) && isValidPlayer(incoming()) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['score', 'status', 'lastUpdate', 'displayName', 'photoURL']);
+        allow delete: if isOwner(userId) || (get(/databases/$(database)/documents/multiplayerRooms/$(roomId)).data.hostId == request.auth.uid);
+      }
+    }
+  }
+}
